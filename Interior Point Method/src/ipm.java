@@ -1,6 +1,6 @@
 public class ipm {
 	
-	public static float InteriorPoint(float[][] G, float[][] c, float[][] A, float[][] b, float[][] x, float[][] y, float[][] lambda){
+	public static float[][] InteriorPoint(float[][] G, float[][] c, float[][] A, float[][] b, float[][] x, float[][] y, float[][] lambda){
 		int m = A.length; // no. of rows
 		int n = A[0].length; // no. of columns
 		int maxIteration = 100;
@@ -9,7 +9,11 @@ public class ipm {
 			tau[i][0] = 0f;
 		float zstar;
 		float[][] zstar1 = new float[maxIteration + 1][1];
-		zstar1[0][0] = findValue(G, x);
+		float[][] value = multiplyMatrix(multiplyMatrix(transposeMatrix(x),G), x);
+		value[0][0] *= 0.5;
+		value[0][0] += dotProduct(x, c);
+		zstar1[0][0] = value[0][0];
+		
 		
 		for(int k = 0; k < maxIteration; k++) {
 			float[][] rd = new float[G.length][1];
@@ -212,245 +216,23 @@ public class ipm {
 			
 			float[][] zstea = multiplyMatrix(multiplyMatrix(transposeMatrix(x),G), x);
 			zstea[0][0] *= 0.5;
+			zstea[0][0] += dotProduct(x, c);
 			zstar1[k+1][0] = zstea[0][0];
 			
 			if(Math.abs(zstar1[k+1][0] - zstar1[k][0]) < 1e-8f)
 				break;
 		}
 		// Solution of the problem
-		float[][] sol = new float[x.length][1];
-		for(int i = 0; i < sol.length; i++)
-			sol[i][0] = x[i][0];
-		
-		// Minimum value of the problem
+		float[][] sol = new float[x.length + 1][1];
 		float[][] zstar2 = multiplyMatrix(multiplyMatrix(transposeMatrix(x),G), x);
-		zstar = zstar2[0][0] * 0.5f;
-		return zstar;
-	}
-	
-	public static float[][] IPM(float[][] G, float[][] c, float[][] A, float[][] b, float[][] x, float[][] y, float[][] lambda){
-		int m = A.length; // no. of rows
-		int n = A[0].length; // no. of columns
-		int maxIteration = 100;
-		float[][] tau = new float[maxIteration][1];
-		for(int i = 0; i < maxIteration; i++)
-			tau[i][0] = 0f;
-		float zstar;
-		float[][] zstar1 = new float[maxIteration + 1][1];
-		zstar1[0][0] = findValue(G, x);
-		
-		for(int k = 0; k < maxIteration; k++) {
-			float[][] rd = new float[G.length][1];
-			float[][] rp = new float[A.length][1];
-			rd = computeRD(G, x, A, lambda, c);
-			rp = computeRP(A, x, y, b);
-			int dimension = G.length + 2 * m;
-			float[][] F = new float[dimension][dimension];
-			
-			// Populating the F matrix
-			for(int i = 0; i < G.length; i++)
-				for(int j = 0; j < G.length; j++)
-					F[i][j] = G[i][j];
-			for(int i = 0; i < G.length; i++)
-				for(int j = G.length; j < G.length + m; j++)
-					F[i][j] = 0;
-			float[][] trMinusA = transposeMatrix(A);
-			int z = 0;
-			for(int i = 0; i < G.length; i++) {
-				int yy = 0;
-				for(int j = G.length + m; j < dimension; j++) {
-					F[i][j] = (-1) * trMinusA[z][yy];
-					yy += 1;
-				}
-				z += 1;	
-			}
-			int zz = 0;
-			for(int i = G.length; i < G.length + m; i++) {
-				int yyy = 0;
-				for(int j = 0; j < n; j++) {
-					F[i][j] = A[zz][yyy];
-					yyy += 1;
-				}
-				zz += 1;	
-			}
-			for(int i = G.length; i < G.length + m; i++) {
-				for(int j = G.length; j < G.length + m; j++) 
-					if(i == j)
-						F[i][j] = -1;
-					else F[i][j] = 0;
-			}
-			for(int i = G.length; i < G.length + m; i++)
-				for(int j = G.length + m; j < dimension; j++)
-					F[i][j] = 0;
-			for(int i = G.length + m; i < dimension; i++)
-				for(int j = 0; j < n; j++)
-					F[i][j] = 0;
-			int zzz = 0;
-			float[][] diaglambda = diag(lambda);
-			for(int i = G.length + m; i < dimension; i++) {
-				for(int j = G.length; j < G.length + m; j++) {
-					if(i - j == m)
-						F[i][j] = diaglambda[zzz][zzz];
-				}
-				zzz += 1;
-			}
-			int zzzz = 0;
-			float[][] diagy = diag(y);
-			for(int i = G.length + m; i < dimension; i++) {
-				for(int j = G.length + m; j < dimension; j++) {
-					if(i == j)
-						F[i][j] = diagy[zzzz][zzzz];
-				}
-				zzzz += 1;
-			}
-			// Populating the equation_b matrix
-			float[][] equation_b = new float[dimension][1];
-			for(int i = 0; i < rd.length; i++)
-				equation_b[i][0] = (-1) * rd[i][0];
-			int mm = 0;
-			for(int i = rd.length; i < rd.length + rp.length; i++) {
-				equation_b[i][0] = (-1) * rp[mm][0];
-				mm++;
-			}
-			
-			float[][] ones = new float[m][1];
-			for(int i = 0; i < m; i++)
-				ones[i][0] = 1;
-			float[][] multiplyDiagLbdYOnes = multiplyMatrix(multiplyMatrixMinus(diaglambda, diagy), ones);
-			int mo = 0;
-			for(int i = rd.length + rp.length; i < dimension; i++) {
-				equation_b[i][0] = multiplyDiagLbdYOnes[mo][0];
-				mo++;
-			}
-			
-			float[] b1 = new float[equation_b.length];
-			for(int i = 0; i < b1.length; i++)
-				b1[i] = equation_b[i][0];
-			float[] solution = GaussJordanElimination.test(F, b1);
-			float[][] delta_x_aff = new float[n][1];
-			float[][] delta_y_aff = new float[m][1];
-			float[][] delta_lambda_aff = new float[m][1];
-			// Populating delta_x_aff matrix
-			for(int i = 0; i < n; i++)
-				delta_x_aff[i][0] = 0;
-			// Populating delta_y_aff matrix
-			for(int i = 0; i < m; i++)
-				delta_y_aff[i][0] = 0;
-			// Populating delta_lambda_aff matrix
-			for(int i = 0; i < m; i++)
-				delta_lambda_aff[i][0] = 0;
-			
-			for(int kk = 0; kk < n; kk++)
-				delta_x_aff[kk][0] = solution[kk];
-			for(int kk = n; kk < n + m; kk++)
-				delta_y_aff[kk - n][0] = solution[kk];
-			for(int kk = n + m; kk < n + 2 * m; kk++)
-				delta_lambda_aff[kk - n - m][0] = solution[kk];
-		
-			// Computing mu
-			float[][] muM = multiplyMatrix(transposeMatrix(y), lambda);
-			float mu = muM[0][0] / m;
-			
-			float alpha_aff = 1;
-			float max1 = maxSumLessThan0(y, alpha_aff, delta_y_aff);
-			float max2 = maxSumLessThan0(lambda, alpha_aff, delta_lambda_aff);
-			boolean compare = compareTwoMax(max1, max2);
-			while(compareTwoMax(max1, max2)) {
-				alpha_aff -= 0.01f;
-				if(alpha_aff <= 0)
-					break;
-				max1 = maxSumLessThan0(y, alpha_aff, delta_y_aff);
-				max2 = maxSumLessThan0(lambda, alpha_aff, delta_lambda_aff);
-			}
-			
-			float[][] sumyalphadelta = computeSum(y, alpha_aff, delta_y_aff);
-			float[][] sumlambdaalphadelta = computeSum(lambda, alpha_aff, delta_lambda_aff);
-			float[][] muA = multiplyMatrix(transposeMatrix(sumyalphadelta),sumlambdaalphadelta);
-			float mu_aff = muA[0][0] / m;
-			
-			float sigma = (mu_aff / mu) * (mu_aff / mu) * (mu_aff / mu);
-			for(int i = 0; i < rd.length; i++)
-				equation_b[i][0] = (-1) * rd[i][0];
-			mm = 0;
-			for(int i = rd.length; i < rd.length + rp.length; i++) {
-				equation_b[i][0] = (-1) * rp[mm][0];
-				mm++;
-			}
-			float[][] diagLambdaAff = diag(delta_lambda_aff);
-			float[][] diagYAff = diag(delta_y_aff);
-			float[][] scalars = ScalarsMatrix(sigma, mu, ones);
-			float[][] multiplyDiagLbdAffYOnes = multiplyMatrix(multiplyMatrixMinus(diagLambdaAff, diagYAff), ones);
-			float[][] addedMatrix = addMatrix(addMatrix(multiplyDiagLbdYOnes, multiplyDiagLbdAffYOnes),scalars);
-			
-			mo = 0;
-			for(int i = rd.length + rp.length; i < dimension; i++) {
-				equation_b[i][0] = addedMatrix[mo][0];
-				mo++;
-			}
-			
-			float[][] delta_x = new float[n][1];
-			for(int i = 0; i < n; i++)
-				delta_x[i][0] = 0;
-			float[][] delta_y = new float[m][1];
-			for(int i = 0; i < m; i++)
-				delta_y[i][0] = 0;
-			float[][] delta_lambda = new float[m][1];
-			for(int i = 0; i < m; i++)
-				delta_lambda[i][0] = 0;
-			
-			for(int i = 0; i < b1.length; i++)
-				b1[i] = equation_b[i][0];
-			solution = GaussJordanElimination.test(F, b1);
-			
-			for(int kk = 0; kk < n; kk++)
-				delta_x[kk][0] = solution[kk];
-			for(int kk = n; kk < n + m; kk++)
-				delta_y[kk - n][0] = solution[kk];
-			for(int kk = n + m; kk < n + 2 * m; kk++)
-				delta_lambda[kk - n - m][0] = solution[kk];
-			
-			tau[k][0] = 0.6f;
-			float alpha_tau_pri = 1;
-			float[][] yAlphaTauDelta = computeSum(y, alpha_tau_pri, delta_y);
-			float[][] oneMinusY = oneMinusTau(tau[k][0], y);
-			float[][] temp_cond = compareIneq(yAlphaTauDelta, oneMinusY);
-			while(sumCompareIneq(temp_cond)) {
-				alpha_tau_pri -= 0.01f;
-				if(alpha_tau_pri <= 0)
-					break;
-				yAlphaTauDelta = computeSum(y, alpha_tau_pri, delta_y);
-				temp_cond = compareIneq(yAlphaTauDelta, oneMinusY);
-			}
-			float alpha_tau_dual = 1;
-			float[][] lambdaAlphaDTauDelta = computeSum(lambda, alpha_tau_dual, delta_lambda);
-			float[][] oneMinusLambda = oneMinusTau(tau[k][0], lambda);
-			temp_cond = compareIneq(lambdaAlphaDTauDelta, oneMinusLambda);
-			while(sumCompareIneq(temp_cond)) {
-				alpha_tau_dual -= 0.01f;
-				if(alpha_tau_dual <= 0)
-					break;
-				lambdaAlphaDTauDelta = computeSum(lambda, alpha_tau_dual, delta_lambda);
-				temp_cond = compareIneq(lambdaAlphaDTauDelta, oneMinusLambda);
-			}
-			
-			float alpha = Math.min(alpha_tau_pri, alpha_tau_dual);
-			x = computeX(x, alpha, delta_x);
-			y = computeX(y, alpha, delta_y);
-			lambda = computeX(lambda, alpha, delta_lambda);
-			
-			float[][] zstea = multiplyMatrix(multiplyMatrix(transposeMatrix(x),G), x);
-			zstea[0][0] *= 0.5;
-			zstar1[k+1][0] = zstea[0][0];
-			
-			if(Math.abs(zstar1[k+1][0] - zstar1[k][0]) < 1e-8f)
-				break;
-		}
-		// Solution of the problem
-		float[][] sol = new float[x.length][1];
-		for(int i = 0; i < sol.length; i++)
-			sol[i][0] = x[i][0];
-		
+		zstar2[0][0] *= 0.5;
+		zstar2[0][0] += dotProduct(x, c);
+		// The first element will be the minimum value of the function (sol[0][0])
+		sol[0][0] = zstar2[0][0];
+		for(int i = 1; i <= x.length; i++)
+			sol[i][0] = x[i-1][0];
 		return sol;
+		
 	}
 	
 	public static float[][] transposeMatrix(float[][] x){
@@ -459,21 +241,6 @@ public class ipm {
 			for(int j = 0; j < x.length; j++)
 				transpose[i][j] = x[j][i];
 		return transpose;
-	}
-
-	
-	public static float findValue(float[][] G, float[][] x){
-        float[][] tx = new float[x.length][1];
-        for(int i = 0; i < x.length;i++){
-              tx[i][0] = x[i][0];
-        }
-        float number = 0;
-        for(int i = 0; i < G[0].length; i++){
-                 for(int j = 0; j < x.length; j++){
-                            number += (1/2)  * tx[j][0] * G[i][j] * x[j][0];
-        	     }
-        }
-        return number;   	
 	}
 	
 	public static float[][] computeX(float[][] x, float alpha, float[][] delta){
@@ -610,23 +377,34 @@ public class ipm {
 			else return false;
 		return true;
 	}
+	
+	public static float dotProductMinus(float[][] a, float[][] b){
+		float s = 0;
+		for(int i = 0; i < a.length; i++)
+			s += a[i][0] * (-1) * b[i][0];
+		return s;
+	}
+	
+	public static float dotProduct(float[][] a, float[][] b){
+		float s = 0;
+		for(int i = 0; i < a.length; i++)
+			s += a[i][0] * b[i][0];
+		return s;
+	}
     
 	
 	public static void main(String[] args){
         float[][] G = new float[][]{{1,0},{0,1}};
-        float[][] c = new float[][]{{0},{0}};
+        float[][] c = new float[][]{{1},{-2}};
         float[][] A = new float[][]{{100,100},{-55,-55}};
-        float[][] b = new float[][]{{5},{-3}};
+        float[][] b1 = new float[][]{{5},{-3}};
         float[][] x = new float[][] {{0},{0}};
         float[][] y = new float[][] {{1},{1}};
         float[][] lambda = new float[][] {{1},{1}};
         
-       float solution = InteriorPoint(G, c, A, b, x, y, lambda);
-       System.out.println(solution);
-       
-       float[][] solutione = IPM(G, c, A, b, x, y, lambda);
-       for(int i = 0; i < 2; i++)
-    	   System.out.println(solutione[i][0]);
+       float[][] solution = InteriorPoint(G, c, A, b1, x, y, lambda);
+       for(int i = 0; i < solution.length; i++)
+    	   System.out.println(solution[i][0]);
 	}
 }
 
